@@ -8,6 +8,6 @@ public class CodeLine {
     int func;
     int par1;
     int par2;
-    int jumpto;
+    int jump;
     double result;
 }

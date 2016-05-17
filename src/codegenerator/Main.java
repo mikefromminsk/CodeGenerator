@@ -13,7 +13,7 @@ public class Main {
             double sqrI = i * i;
             dx = 1.0 / sqrI;
             double resMul6 = res * 6.0;
-            piResult = Math.sqrt(resMul6);
+            piResult = Math.pow(resMul6, -2);
     } while (i < 1000000.0 / 6.0);
     }
 

@@ -16,13 +16,17 @@ class FunctionID implements Serializable {
      */
     BigInteger funcIndex;
     /**
+     * Идентификатор по которому восстанавливаются присваивания.
+     */
+    BigInteger valueIndex;
+    /**
      * Идентификатор по которому восстанавливаются параметры к функциям.
      */
     BigInteger paramsIndex;
     /**
      * Идентификатор по которому восстанавливаются условные операторы к функиям сравнения.
      */
-    BigInteger jumptoIndex;
+    BigInteger jumpIndex;
     /**
      * Номер строчки в которой находится результат после выполнения функции.
      */
