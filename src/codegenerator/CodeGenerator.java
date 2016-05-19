@@ -56,16 +56,17 @@ public class CodeGenerator implements Runnable {
      * В реальности данный код существует в виде массива структур CodeLine где указаны переменные для создания и воссоздания
      * любой функции. Данные структуры и заполняются в этом классе.
      */
-    int blockID;
+    Long blockID;
 
-    CodeGenerator(int blockID) {
+    CodeGenerator(Integer blockSize, Long blockID) {
+        this.blockSize = BigInteger.valueOf(blockSize);
         this.blockID = blockID;
     }
 
     // Устанавливаем исходные переменные которые будут вечно складываться умножаться и т.д.
     // Теоретически можно установить всего два числа в исходных данных, но тогда количество строк которые нужно
     // для реализации того или иного алгоритма будут увеличиваться в геометрической прогрессии.
-    static final double[] inputVars = {-2.0, 0.0, 1.0, 6.0};
+    static final double[] inputVars = {0.5, 0.0, 1.0, 6.0};
     // Устанавливаем количество используемых функций. (+ - * / pow == != > <)
     // В конце кода есть switch с расшифровкой соответствия номера к действию.
     // BigInteger для того что бы меньше делать cast
@@ -77,14 +78,14 @@ public class CodeGenerator implements Runnable {
     ArrayList<FunctionID> goodFunctionID = new ArrayList<FunctionID>();
 
     // Размер блока для майнинга. Значит что в блоке находится такое количество фунций которые будут сгенерированы.
-    final BigInteger blockSize = BigInteger.valueOf(200);
+    final BigInteger blockSize;
 
     // Вычесляем идентификатор первой фунции. По этому идентификатору будет определяться тело функции.
-    BigInteger begFuncIndex(Integer blockID) {
+    BigInteger begFuncIndex(Long blockID) {
         return BigInteger.valueOf(blockID).multiply(blockSize);
     }
 
-    BigInteger maxFuncIndex(Integer blockID) {
+    BigInteger maxFuncIndex(Long blockID) {
         return BigInteger.valueOf(blockID + 1).multiply(blockSize);
     }
 
@@ -125,7 +126,6 @@ public class CodeGenerator implements Runnable {
      * Первая строчка не может использовать присваивание.
      * Вторая строчка может присвоить только первую.
      * Пример: Если код состоит из 5 строчек то вариации присваиваний будут
-     *
      *
      * @param codeLine
      * @return
@@ -210,7 +210,7 @@ public class CodeGenerator implements Runnable {
      * Например в функции 5 строк и 2 из них с функциями сравнения.
      * Итого 4^2=16 вариантов перехода из 2ух строк сравнения во все другие строки.
      */
-    static BigInteger maxJumpIndex(List<CodeLine> codeLines){
+    static BigInteger maxJumpIndex(List<CodeLine> codeLines) {
         // Считаем количество строк в которых есть функции сравнения
         int compareFunctionsCount = 0;
         for (int i = 0; i < codeLines.size(); i++)
@@ -219,9 +219,9 @@ public class CodeGenerator implements Runnable {
         return BigInteger.valueOf(codeLines.size() - 1).pow(compareFunctionsCount);
     }
 
-    static void setJumps(BigInteger jumpIndex, List<CodeLine> codeLines){
+    static void setJumps(BigInteger jumpIndex, List<CodeLine> codeLines) {
         BigInteger codeLineCountWithoutOne = BigInteger.valueOf(codeLines.size() - 1);
-        for (int i = 0; i < codeLines.size(); i++){
+        for (int i = 0; i < codeLines.size(); i++) {
             CodeLine codeLine = codeLines.get(i);
             if (codeLine.func >= firstCompareFuncPosition) // == != > <
             {
@@ -234,7 +234,7 @@ public class CodeGenerator implements Runnable {
         }
     }
 
-    static List<CodeLine> getFunctionBody(FunctionID functionID){
+    static List<CodeLine> getFunctionBody(FunctionID functionID) {
         List<CodeLine> codeLines = new ArrayList<CodeLine>();
         setFunctions(functionID.funcIndex, codeLines);
         setValues(functionID.valueIndex, codeLines);
@@ -250,8 +250,9 @@ public class CodeGenerator implements Runnable {
      * Так как в программах могут быть вечные циклы, устанавливается максимальное колчество
      * выполненных строк кода.
      */
-    static void runCode(List<CodeLine> codeLines){
+    static double runCode(List<CodeLine> codeLines) {
 
+        // Максимальное количество выполненных строк кода. (Ограничитель вечных циклов)
         double maxRunTime = 10000;
         double runTime = 0;
         int activeLine = 0;
@@ -307,6 +308,11 @@ public class CodeGenerator implements Runnable {
                     codeLine.result = (par1Value < par2Value) ? 1 : 0;
                     break;
             }
+
+            if (codeLine.value != 0) {
+                codeLines.get(codeLine.value - 1).result = codeLine.result;
+            }
+
             // Переходим по условному оператору если результат выполнения функции сравнения равна еденице
             if (codeLine.jump != 0 && codeLine.result == 1) {
                 activeLine = codeLine.jump - 1;
@@ -315,8 +321,33 @@ public class CodeGenerator implements Runnable {
             // Переходим на следующую строку
             activeLine++;
         }
+        return runTime;
     }
 
+
+    /**
+     * Проверка результата.
+     * Так как мы не знаем в какой строке будет находится результат, то проверим сразу все строки.
+     * Берем округленное число пи что бы посмотреть похожие функции.
+     */
+    void setResult(FunctionID functionID, List<CodeLine> codeLines) {
+
+        double rightResult = 3.14;
+        for (int resultPosition = 0; resultPosition < codeLines.size(); resultPosition++) {
+            CodeLine codeLine = codeLines.get(resultPosition);
+            // Округлим результат для того что бы найти все похожие на то что мы ищем.
+            // Это можно убрать и будет искаться точное значение.
+            double roundResult = Math.round(codeLine.result * 100.0) / 100.0;
+
+            if (roundResult == rightResult) {
+                // Устанавливаем
+                functionID.resultPosition = resultPosition;
+                goodFunctionID.add(functionID);
+                break;
+            }
+
+        }
+    }
 
     /**
      * Данная фунция генерирует код всех фунций в определенном блоке.
@@ -672,9 +703,9 @@ public class CodeGenerator implements Runnable {
 
                     // Когда все фукнции были сгенерированы и выполнены сохраняем результаты и выходим.
                     if (lineSize >= maxLineSize && funcIndex.compareTo(maxFuncIndex) == 1) {
-                        Sync.log("block " + blockID + " time " + lineSize + " func " + maxFuncIndex.toString() + " runtime " + (int) ((System.currentTimeMillis() - beginTime) / 1000) + " s");
+                        Syncronizator.log("block " + blockID + " time " + lineSize + " func " + maxFuncIndex.toString() + " runtime " + (int) ((System.currentTimeMillis() - beginTime) / 1000) + " s");
                         // Передаем результат выполнения функций
-                        Block generateBlock = Sync.data.blocks.get(blockID);
+                        Block generateBlock = Syncronizator.data.blocks.get(blockID);
                         generateBlock.goodFunctionID = goodFunctionID;
                         // И говорим что поток завершился успешно
                         generateBlock.threadEnd = true;

@@ -2,8 +2,9 @@ package codegenerator;
 
 public class Main {
 
-    static double piResult = 0; // Можно убрать
-    public static void calculatePI() {
+    public static double calculatePI() {
+        double piResult = 0.0; // Не входит в codeLines нужно для инициализации в Java
+        // begin codeLines
         double res = 0.0 + 0.0;
         double i = 1.0 + 0.0;
         double dx = 1.0 + 0.0;
@@ -13,18 +14,15 @@ public class Main {
             double sqrI = i * i;
             dx = 1.0 / sqrI;
             double resMul6 = res * 6.0;
-            piResult = Math.pow(resMul6, -2);
-    } while (i < 1000000.0 / 6.0);
+            piResult = Math.pow(resMul6, 0.5);
+    } while (i < 10000.0 / 7.0); // Ограничитель вечного цикла. В codeLines стоит while (1.0 == 1.0)
+        // end codeLines
+        return piResult;
     }
-
-    //TODO Разбить CodeGenerator по функциям
-    //TODO Убрать избыточность
-
-
 
     public static void main(String[] args) {
         //System.out.println(calculatePI());
         //new Thread(new Sync(2, new File(""))).start();
-        new Thread(new CodeGenerator(5)).start();
+        //new Thread(new CodeGenerator(5)).start();
     }
 }

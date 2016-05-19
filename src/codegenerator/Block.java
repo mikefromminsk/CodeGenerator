@@ -1,6 +1,7 @@
 package codegenerator;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
 
 /**
@@ -10,7 +11,7 @@ class Block implements Serializable {
     /**
      * Уникальный идентификатор блока.
      */
-    Integer ID;
+    Long ID;
     /**
      * Идентификатор устройства которое майнит блок.
      */

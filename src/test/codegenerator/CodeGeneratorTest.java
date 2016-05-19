@@ -153,7 +153,7 @@ public class CodeGeneratorTest {
     }
 
     @Test
-    public void getFunctionBodyTest() {
+    public void generatePiFunctionTest() {
 
         //Восстановим данную функцию
         /*
@@ -168,14 +168,14 @@ public class CodeGeneratorTest {
             double sqrI = i * i;
             dx = 1.0 / sqrI;
             double resMul6 = res * 6.0;
-            piResult = Math.pow(resMul6, -2);
+            piResult = Math.pow(resMul6, 0.5);
     } while (i < 1000000.0 / 6.0); // while (1.0 == 1.0)
     }
     + - * / pow == != > <
 
          */
         Assert.assertEquals(9, CodeGenerator.funcCount.intValue());
-        Assert.assertEquals(-2.0, CodeGenerator.inputVars[0]);
+        Assert.assertEquals(0.5, CodeGenerator.inputVars[0]);
         Assert.assertEquals(0.0, CodeGenerator.inputVars[1]);
         Assert.assertEquals(1.0, CodeGenerator.inputVars[2]);
         Assert.assertEquals(6.0, CodeGenerator.inputVars[3]);
@@ -265,14 +265,15 @@ public class CodeGeneratorTest {
         Assert.assertEquals(2, codeLines.get(9).par2);
 
         functionID.jumpIndex = BigInteger.ZERO;
-        functionID.jumpIndex = BigInteger.valueOf(3);
+        functionID.jumpIndex = BigInteger.valueOf(4);
 
         CodeGenerator.setJumps(functionID.jumpIndex, codeLines);
-        Assert.assertEquals(3, codeLines.get(9).jump);
+        Assert.assertEquals(4, codeLines.get(9).jump);
 
         CodeGenerator.runCode(codeLines);
+        Assert.assertEquals(Main.calculatePI(), codeLines.get(8).result);
 
-
+        System.out.println("funcIndex of pi function " + functionID.funcIndex);
     }
 
 

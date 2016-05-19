@@ -1,8 +1,9 @@
 package codegenerator;
 
-import codegenerator.utils.Base64;
+import com.google.gson.Gson;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -41,15 +42,23 @@ public class GlobalVars implements Serializable {
     /**
      * Порядковый идентификатор последней намайненой фунции
      */
-    Integer lastBlockID = 0;
+    Long lastBlockID = 1L;
     /**
      * Намайненые и блоки которые ещё майнятся блоки
      */
-    public Map<Integer, Block> blocks = Collections.synchronizedMap(new HashMap<Integer, Block>());
+    public Map<Long, Block> blocks = Collections.synchronizedMap(new HashMap<Long, Block>());
     /**
      * известные хосты для майнинга блоков
      */
     public ArrayList<String> hosts = new ArrayList<String>();
+    /**
+     * Количество генерируемых функций в блоке
+     */
+    public Integer blockSize;
+    /**
+     * Последний блок майнинга. Нужен для остановки вечного майнинга.
+     */
+    public Long endBlockID;
 
 
     public static InetAddress getCurrentIp() {
@@ -92,77 +101,30 @@ public class GlobalVars implements Serializable {
         return getCurrentIp().getHostAddress();
     }
 
-
-    public static synchronized GlobalVars deserializeGlobalVars(String s) {
-        byte[] data = codegenerator.utils.Base64.decode(s);
-        ObjectInputStream ois = null;
-        Object o = null;
-        try {
-            ois = new ObjectInputStream(new ByteArrayInputStream(data));
-            o = ois.readObject();
-            ois.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return (GlobalVars)o;
-    }
-
     void loadFromFile(){
         try {
             String strHostData = new Scanner(new File(propertyDir, GlobalVars.class.getSimpleName())).useDelimiter("\\Z").next();
             if (!strHostData.equals("")) {
-                GlobalVars globalVars = deserializeGlobalVars(strHostData);
+                GlobalVars globalVars = Syncronizator.json.fromJson(strHostData, GlobalVars.class);
                 this.blocks = globalVars.blocks;
                 this.lastBlockID = globalVars.lastBlockID;
                 this.hosts = globalVars.hosts;
             }
 
-        } catch (FileNotFoundException e) {
-            //Простая заплаточка со списком моих хостов. Сделана что бы не использовать централизованный сервер.
-            // TODO Сделать сканер сети
-            this.hosts.add("192.168.1.10:8080");
-            this.hosts.add("192.168.1.10:8081");
-            this.hosts.add("192.168.1.8:8080");
+        } catch (Exception e) {
+            Syncronizator.log("settingFile not found");
         }
-    }
-
-
-    public static synchronized String serializeGlobalVars(GlobalVars o) {
-        ByteArrayOutputStream baos = null;
-
-        try {
-            baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-            oos.writeObject(o);
-            oos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return new String(Base64.encode(baos.toByteArray()));
     }
 
     public void saveToFile() {
         try {
-            FileWriter fw = new FileWriter(new File(propertyDir, GlobalVars.class.getSimpleName()));
-            fw.write(serializeGlobalVars(this));
-            fw.close();
-        } catch (IOException e) {
-            Sync.log("global vars file not save");
+            if (propertyDir != null) {
+                FileWriter fw = new FileWriter(new File(propertyDir, GlobalVars.class.getSimpleName()));
+                fw.write(Syncronizator.json.toJson(this));
+                fw.close();
+            }
+        } catch (Exception e) {
+            Syncronizator.log("global vars file not save");
         }
-    }
-
-    public static String getAllMiningData() {
-        ByteArrayOutputStream baos = null;
-        try {
-            baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-            oos.writeObject(Sync.data);
-            oos.close();
-        } catch (IOException e) {
-            Sync.log("serializable error" + e.getMessage());
-        }
-        return new String(Base64.encode(baos.toByteArray()));
     }
 }

@@ -3,26 +3,31 @@ package codegenerator;
 
 import codegenerator.web.HttpRequest;
 import codegenerator.web.HttpServer;
+import com.google.gson.Gson;
 
 import java.io.File;
 import java.util.*;
 
 /**
  * Класс управления многопоточного майнинга.
- *
+ * <p/>
  * Для того что бы генерировать код на нескольких устройствах, задача генерации была поделена на равные блоки.
  * И для того что бы новое подключенное устройство не майнило уже смайненые блоки, и был создан данный класс.
  */
-public class Sync implements Runnable {
+public class Syncronizator implements Runnable {
 
     /**
      * Глобальные переменные обернуты в класс для последующей передачи их дружественным устройствам.
      */
     public static GlobalVars data = new GlobalVars();
 
+    public static Gson json = new Gson();
 
-    public Sync(Integer activeThreadCount, File propertyDir) {
+    public Syncronizator(Integer activeThreadCount, Integer blockSize, Long lastBlockID, Long endBlockID, File propertyDir) {
         data.activeThreadCount = activeThreadCount;
+        data.blockSize = blockSize;
+        data.lastBlockID = lastBlockID;
+        data.endBlockID = endBlockID;
         data.propertyDir = propertyDir;
     }
 
@@ -37,15 +42,16 @@ public class Sync implements Runnable {
      */
     public static ArrayList<String> logHistory = new ArrayList<String>();
 
-    public static String getLogHistory(){
+    public static String getLogHistory() {
         String result = "";
-        for (String logLine: logHistory)
+        for (String logLine : logHistory)
             result += logLine;
         return result;
     }
 
     public static synchronized void log(String str) {
         // В начале идут самые последние
+        System.out.println(str);
         logHistory.add(0, str + "<br/>\n");
         // Ограничение длинны логов до 500 последних записей
         if (logHistory.size() > 500)
@@ -80,8 +86,8 @@ public class Sync implements Runnable {
         while (true) {
 
             //Чистим список блоков от метрвых блоков.
-            for (Iterator<Map.Entry<Integer, Block>> it = data.blocks.entrySet().iterator(); it.hasNext(); ) {
-                Map.Entry<Integer, Block> entry = it.next();
+            for (Iterator<Map.Entry<Long, Block>> it = data.blocks.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<Long, Block> entry = it.next();
                 Block block = entry.getValue();
                 Thread thread = threads.get(block.threadID);
                 // если чужой блок не был закончен в отведенное ему время считаем что устройство было выключено.
@@ -107,13 +113,13 @@ public class Sync implements Runnable {
                 if ("".equals(response)) //если устройство выключено или ошибка запроса.
                     continue;
                 //производим десериализацию.
-                GlobalVars remoteGlobalVars = GlobalVars.deserializeGlobalVars(response);
+                GlobalVars remoteGlobalVars = json.fromJson(response, GlobalVars.class);
                 if (remoteGlobalVars == null)
                     continue;
 
                 //Останавливаем потоки и удаляем у себя блоки которые уже смайнило дружественное устройство или ещё майнит.
-                for (Iterator<Map.Entry<Integer, Block>> it = data.blocks.entrySet().iterator(); it.hasNext(); ) {
-                    Map.Entry<Integer, Block> entry = it.next();
+                for (Iterator<Map.Entry<Long, Block>> it = data.blocks.entrySet().iterator(); it.hasNext(); ) {
+                    Map.Entry<Long, Block> entry = it.next();
                     Block localBlock = entry.getValue();
                     Block remoteBlock = remoteGlobalVars.blocks.get(localBlock.ID);
                     // если мы майним блок который уже смайнил или майнит дружественное устройство то перестаем майнить.
@@ -136,7 +142,7 @@ public class Sync implements Runnable {
                 }
 
                 //Добавляем в свой список блоков все блоки которые майнятся удаленно.
-                for (Integer blockID : remoteGlobalVars.blocks.keySet()) {
+                for (Long blockID : remoteGlobalVars.blocks.keySet()) {
                     Block remoteBlock = remoteGlobalVars.blocks.get(blockID);
                     if ((remoteBlock.ID > data.lastBlockID) && (!remoteBlock.mac.equals(data.mac)))
                         data.blocks.put(blockID, remoteBlock);
@@ -175,36 +181,42 @@ public class Sync implements Runnable {
 
 
             //Запускаем новые потоки майнинга.
-            for (int j = threads.size() - 1; j < data.activeThreadCount - 1; j++) {
+            if (data.lastBlockID <= data.endBlockID)
+                for (int j = threads.size() - 1; j < data.activeThreadCount - 1; j++) {
 
-                //Вычисляем идентификатор несмайненого блока.
-                int nextBlockID = data.lastBlockID + 1;
-                while (true) {
-                    Block block = data.blocks.get(nextBlockID);
-                    if (block == null)
-                        break;
-                    //Если где то майнится то проверяем следующий идентификатор.
-                    nextBlockID++;
+                    //Вычисляем идентификатор несмайненого блока.
+                    Long nextBlockID = data.lastBlockID + 1;
+                    while (true) {
+                        Block block = data.blocks.get(nextBlockID);
+                        if (block == null)
+                            break;
+                        //Если где то майнится то проверяем следующий идентификатор.
+                        nextBlockID++;
+                    }
+
+                    //Запускаем генератор кода для блока в новом потоке с минимальным приоритетом.
+                    Thread newThread = new Thread(new CodeGenerator(data.blockSize, nextBlockID));
+                    newThread.setPriority(Thread.MIN_PRIORITY);
+                    threads.put(newThread.getId(), newThread);
+
+                    //Регистрируем новый блок в списке блоков.
+                    Block block = new Block();
+                    block.ID = nextBlockID;
+                    block.endTime = System.currentTimeMillis() + 60000;
+                    block.mac = data.mac;
+                    block.threadID = newThread.getId();
+                    data.blocks.put(nextBlockID, block);
+
+                    //И как говорил Гагарин: "Поехали!"
+                    newThread.start();
                 }
 
-                //Запускаем генератор кода для блока в новом потоке с минимальным приоритетом.
-                Thread newThread = new Thread(new CodeGenerator(nextBlockID));
-                newThread.setPriority(Thread.MIN_PRIORITY);
-                threads.put(newThread.getId(), newThread);
-
-                //Регистрируем новый блок в списке блоков.
-                Block block = new Block();
-                block.ID = nextBlockID;
-                block.endTime = System.currentTimeMillis() + 60000;
-                block.mac = data.mac;
-                block.threadID = newThread.getId();
-                data.blocks.put(nextBlockID, block);
-
-                //И как говорил Гагарин: "Поехали!"
-                newThread.start();
-            }
 
             data.saveToFile();
+
+            // Выходим когда все блоки были смайнены
+            if (threads.size() == 0)
+                return;
 
             //Делаем задержку между проверками синхронизатора потоков.
             try {

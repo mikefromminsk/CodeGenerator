@@ -1,7 +1,7 @@
 package codegenerator.web;
 
 import codegenerator.GlobalVars;
-import codegenerator.Sync;
+import codegenerator.Syncronizator;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -18,17 +18,17 @@ public class HttpServer implements Runnable {
         int port = GlobalVars.httpPort;
         while (true) {
             try {
-                Sync.log("try open " + port + " port");
+                Syncronizator.log("try open " + port + " port");
                 ServerSocket ss = new ServerSocket(port);
-                Sync.log("HttpServer open on " + port + " port");
-                Sync.data.httpPort = port;
+                Syncronizator.log("HttpServer open on " + port + " port");
+                Syncronizator.data.httpPort = port;
                 while (true) {
                     Socket s = ss.accept();
                     new Thread(new Response(s)).start();
                 }
             } catch (Throwable e) {
                 // порт занят и ищем другой не занятый
-                Sync.log("port " + port + " closed");
+                Syncronizator.log("port " + port + " closed");
                 port++;
             }
         }
@@ -58,7 +58,7 @@ public class HttpServer implements Runnable {
                         if (firstLine == null)
                             firstLine = readLine;
                     } catch (IOException e) {
-                        Sync.log("read header error " + e.getMessage());
+                        Syncronizator.log("read header error " + e.getMessage());
                     }
                     if (readLine == null || readLine.trim().length() == 0)
                         break;
@@ -66,9 +66,9 @@ public class HttpServer implements Runnable {
                 // На сервере всего две странички это страничка логов(/log) и смайнеными данными(/)
                 String resultData;
                 if (firstLine.indexOf("log") != -1)
-                    resultData = Sync.getLogHistory();
+                    resultData = Syncronizator.getLogHistory();
                 else
-                    resultData = GlobalVars.getAllMiningData();
+                    resultData = Syncronizator.json.toJson(Syncronizator.data);
 
                 // Отправляем данные
                 String response = "HTTP/1.1 200 OK\r\n" +
@@ -81,13 +81,13 @@ public class HttpServer implements Runnable {
                     os.write(result.getBytes());
                     os.flush();
                 } catch (IOException e) {
-                    Sync.log("write result error" + e.getMessage());
+                    Syncronizator.log("write result error" + e.getMessage());
                 }
             } finally {
                 try {
                     s.close();
                 } catch (IOException e) {
-                    Sync.log("socket close error" + e.getMessage());
+                    Syncronizator.log("socket close error" + e.getMessage());
                 }
             }
         }

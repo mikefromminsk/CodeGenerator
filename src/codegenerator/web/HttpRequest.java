@@ -1,6 +1,6 @@
 package codegenerator.web;
 
-import codegenerator.Sync;
+import codegenerator.Syncronizator;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -26,7 +26,7 @@ public class HttpRequest {
             }
             rd.close();
         } catch (Exception e) {
-            Sync.log("http request to " + urlToRead + " error " + e.getMessage());
+            Syncronizator.log("http request to " + urlToRead + " error " + e.getMessage());
         }
         return result;
     }
