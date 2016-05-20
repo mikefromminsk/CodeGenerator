@@ -17,105 +17,56 @@ public class CodeGenerator2Test {
         return equalsCount == a.length * a[0].length;
     }
 
+
     @Test
     public void getCodeTest(){
         CodeGenerator2 generator = new CodeGenerator2(1);
-        BigInteger index = generator.maxIndexInFunction.subtract(BigInteger.ONE);
+        BigInteger index = generator.maxIndexInProgram.subtract(BigInteger.ONE);
         int[][] code = generator.getCode(index);
-        Assert.assertEquals(1, code[0][0]);
-        Assert.assertEquals(0, code[0][1]);
-        Assert.assertEquals(8, code[0][2]);
-        Assert.assertEquals(4, code[0][3]);
-        Assert.assertEquals(4, code[0][4]);
-        Assert.assertEquals(0, code[0][5]);
-
-        BigInteger index2 = generator.getIndex(code);
-        Assert.assertEquals(index, index2);
+        Assert.assertTrue(equalsArrays(new int[][]{{1, 0, 8, 4, 4, 0}}, code));
     }
 
     @Test
     public void getCode2Test(){
         CodeGenerator2 generator = new CodeGenerator2(2);
-        int[][] code = generator.getCode(generator.maxIndexInFunction.subtract(BigInteger.ONE));
-        Assert.assertEquals(1, code[0][0]);
-        Assert.assertEquals(1, code[0][1]);
-        Assert.assertEquals(8, code[0][2]);
-        Assert.assertEquals(5, code[0][3]);
-        Assert.assertEquals(5, code[0][4]);
-        Assert.assertEquals(1, code[0][5]);
-
-        Assert.assertEquals(1, code[1][0]);
-        Assert.assertEquals(1, code[1][1]);
-        Assert.assertEquals(8, code[1][2]);
-        Assert.assertEquals(5, code[1][3]);
-        Assert.assertEquals(5, code[1][4]);
-        Assert.assertEquals(1, code[1][5]);
+        int[][] code = generator.getCode(generator.maxIndexInProgram.subtract(BigInteger.ONE));
+        Assert.assertTrue(equalsArrays(new int[][]{{1,1,8,5,5,1}, {1,1,8,5,5,1}}, code));
     }
 
-    public double calculatePiInJavaView() {
-        double result = 0;
-        double dx = 1;
-        for (int i = 1; i < 10000; i++) {
-            result = result + dx;
-            dx = 1.0 / (i * i);
-        }
-        return Math.sqrt(result * 6.0);
+    @Test
+    public void getIndexTest(){
+        CodeGenerator2 generator = new CodeGenerator2(1);
+        int[][] code = new int[][]{{1,0,2,3,4,0}};
+        BigInteger index = generator.getIndex(code);
+        int[][] encode = generator.getCode(index);
+        Assert.assertTrue(equalsArrays(code, encode));
     }
-
-    public static double calculatePiInTableView() {
-        // {0.0, 1.0, 6.0, 0.5};
-        double res = 0.0 + 0.0;
-        double i = 1.0 + 0.0;
-        double dx = 1.0 + 0.0;
-        do {
-            i = i + 1.0;
-            res = res + dx;
-            double sqrI = i * i;
-            dx = 1.0 / sqrI;
-        } while (i < Math.pow(6.0, 6.0));
-        double resMul6 = res * 6.0;
-        return Math.pow(resMul6, 0.5);
-    }
-
-    int[][] calculatePIInTableView = {
-            {0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 1, 0, 0},
-            {0, 0, 0, 1, 0, 0},
-            {0, 2, 0, 5, 1, 0},
-            {0, 1, 0, 4, 6, 0},
-            {0, 0, 2, 5, 5, 0},
-            {0, 3, 3, 1, 9, 0},
-            {0, 0, 4, 2, 2, 0},
-            {0, 0, 8, 5, 11, 4},
-            {0, 0, 2, 4, 2, 0},
-            {1, 0, 4, 13, 3, 0}
-    };
 
     @Test
     public void calculatePiInTableViewTest(){
-        Assert.assertTrue(new CodeGenerator2(1).testPiValue(calculatePiInTableView()));
+        Assert.assertTrue(new CodeGenerator2(1).testPiValue(CodeGenerator2.calculatePiInTableView()));
     }
 
     @Test
     public void getIndexAndGetCodeTest(){
-        CodeGenerator2 generator = new CodeGenerator2(calculatePIInTableView.length);
-        BigInteger index = generator.getIndex(calculatePIInTableView);
+        CodeGenerator2 generator = new CodeGenerator2(CodeGenerator2.calculatePIInTable.length);
+        BigInteger index = generator.getIndex(CodeGenerator2.calculatePIInTable);
         int[][] code = generator.getCode(index);
-        Assert.assertTrue(equalsArrays(calculatePIInTableView, code));
+        Assert.assertTrue(equalsArrays(CodeGenerator2.calculatePIInTable, code));
     }
 
     @Test
     public void runCodeTest(){
-        CodeGenerator2 generator = new CodeGenerator2(calculatePIInTableView.length);
-        Double functionResult = generator.invoke(calculatePIInTableView, BigInteger.valueOf(1000000));
+        CodeGenerator2 generator = new CodeGenerator2(CodeGenerator2.calculatePIInTable.length);
+        Double functionResult = generator.invoke(CodeGenerator2.calculatePIInTable, BigInteger.valueOf(1000000));
         Assert.assertTrue(generator.testPiValue(functionResult));
     }
 
     @Test
     public void generatePiTest(){
-        CodeGenerator2 generator = new CodeGenerator2(calculatePIInTableView.length);
-        BigInteger index = generator.getIndex(calculatePIInTableView);
-        List<BigInteger> goodFunctions = generator.generatePI(index, BigInteger.valueOf(100), BigInteger.valueOf(1000000));
+        CodeGenerator2 generator = new CodeGenerator2(CodeGenerator2.calculatePIInTable.length);
+        BigInteger index = generator.getIndex(CodeGenerator2.calculatePIInTable);
+        List<BigInteger> goodFunctions = generator.generateBlockOfTask(index, BigInteger.valueOf(3), BigInteger.valueOf(1000000));
         boolean findCalculatePIInTableView = false;
         for (int i = 0; i < goodFunctions.size(); i++)
             if (goodFunctions.get(i).compareTo(index) == 0)
