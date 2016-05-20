@@ -1,11 +1,10 @@
 package codegenerator2;
 
-import codegenerator.Main;
-import com.google.gson.Gson;
 import junit.framework.Assert;
 import org.junit.Test;
 
 import java.math.BigInteger;
+import java.util.List;
 
 public class CodeGenerator2Test {
 
@@ -53,6 +52,15 @@ public class CodeGenerator2Test {
         Assert.assertEquals(1, code[1][5]);
     }
 
+    public double calculatePiInJavaView() {
+        double result = 0;
+        double dx = 1;
+        for (int i = 1; i < 10000; i++) {
+            result = result + dx;
+            dx = 1.0 / (i * i);
+        }
+        return Math.sqrt(result * 6.0);
+    }
 
     public static double calculatePiInTableView() {
         // {0.0, 1.0, 6.0, 0.5};
@@ -99,7 +107,19 @@ public class CodeGenerator2Test {
     @Test
     public void runCodeTest(){
         CodeGenerator2 generator = new CodeGenerator2(calculatePIInTableView.length);
-        Double functionResult = generator.runCode(calculatePIInTableView, BigInteger.valueOf(1000000));
+        Double functionResult = generator.invoke(calculatePIInTableView, BigInteger.valueOf(1000000));
         Assert.assertTrue(generator.testPiValue(functionResult));
+    }
+
+    @Test
+    public void generatePiTest(){
+        CodeGenerator2 generator = new CodeGenerator2(calculatePIInTableView.length);
+        BigInteger index = generator.getIndex(calculatePIInTableView);
+        List<BigInteger> goodFunctions = generator.generatePI(index, BigInteger.valueOf(100), BigInteger.valueOf(1000000));
+        boolean findCalculatePIInTableView = false;
+        for (int i = 0; i < goodFunctions.size(); i++)
+            if (goodFunctions.get(i).compareTo(index) == 0)
+                findCalculatePIInTableView = true;
+        Assert.assertTrue(findCalculatePIInTableView);
     }
 }
