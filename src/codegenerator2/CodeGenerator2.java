@@ -7,6 +7,7 @@ import java.util.List;
 public class CodeGenerator2 {
 
     static final double[] inputs = {0.0, 1.0, 6.0, 0.5};
+    Integer lineCount;
 
     final int returnPosInCodeLine = 0;
     final int valuePosInCodeLine = 1;
@@ -19,18 +20,25 @@ public class CodeGenerator2 {
     BigInteger returnFlagCount = BigInteger.valueOf(2); // Флаг что в этой строчке находится результат.
     BigInteger valuePlaceCount; // Мест куда можно присвоить значение.
     BigInteger functionCount = BigInteger.valueOf(9); // Количество возможных функций.
-    BigInteger paramValuesCount = functionCount.add(inputVariableCount); // Количество возможных значений одного параметра
+    BigInteger paramValuesCount; // Количество возможных значений одного параметра
     BigInteger jumpPlaceCount;  // Количество возможных переходов.
 
-    private void setGlobalVariables(Integer lineCount) {
-        valuePlaceCount = BigInteger.valueOf(lineCount - 1);
-        paramValuesCount = inputVariableCount.add(functionCount);
-        jumpPlaceCount = BigInteger.valueOf(lineCount - 1);
+    public CodeGenerator2(int lineCount) {
+        this.lineCount = lineCount;
+        setGlobalVariables();
+    }
+
+    public void setGlobalVariables() {
+        BigInteger lineCountBigInt = BigInteger.valueOf(lineCount);
+        valuePlaceCount = lineCountBigInt;
+        paramValuesCount = inputVariableCount.add(lineCountBigInt);
+        jumpPlaceCount = lineCountBigInt;
         setMaxIndexInOneLine();
         setMaxIndexInFunction(lineCount);
     }
 
-    private BigInteger maxIndexInOneLine; // Максимальный индекс одной строке.
+    public BigInteger maxIndexInOneLine; // Максимальный индекс одной строке.
+
     void setMaxIndexInOneLine() {
         maxIndexInOneLine = BigInteger.ONE;
         maxIndexInOneLine = maxIndexInOneLine.multiply(returnFlagCount);
@@ -41,7 +49,7 @@ public class CodeGenerator2 {
         maxIndexInOneLine = maxIndexInOneLine.multiply(jumpPlaceCount);
     }
 
-    private BigInteger maxIndexInFunction; // Максимальный индекс во всех строках функции
+    public BigInteger maxIndexInFunction; // Максимальный индекс во всех строках функции
 
     void setMaxIndexInFunction(Integer lineCount) {
         setMaxIndexInOneLine();
@@ -50,7 +58,7 @@ public class CodeGenerator2 {
             maxIndexInFunction = maxIndexInFunction.multiply(maxIndexInOneLine);
     }
 
-    int[][] getCode(Integer lineCount, BigInteger index) {
+    int[][] getCode(BigInteger index) {
         // 6 = результат, присваивание, фунция, параметр1, параметр2, переход
         int[][] code = new int[lineCount][6];
         for (int i = 0; i < lineCount; i++) {
@@ -71,8 +79,7 @@ public class CodeGenerator2 {
         return code;
     }
 
-    BigInteger runCode(int[][] code, BigInteger maxOfRunLine) {
-        int lineCount = code.length;
+    Double runCode(int[][] code, BigInteger maxOfRunLine) {
         double[] results = new double[lineCount]; //Столько же сколько и строк в функции
         BigInteger countOfRunLine = BigInteger.ZERO;
         int activeLine = 0;
@@ -111,35 +118,31 @@ public class CodeGenerator2 {
                     results[activeLine] = (param1Value < param2Value) ? 1 : 0;
                     break;
             }
-            int valueIndex = code[valuePosInCodeLine][activeLine];
+            int valueIndex = code[activeLine][valuePosInCodeLine];
             if (valueIndex != 0)
-                results[valueIndex - 1 >= activeLine ? valueIndex : valueIndex - 1] = results[activeLine];
+                results[valueIndex >= activeLine ? valueIndex : valueIndex - 1] = results[activeLine];
+
+            if (code[activeLine][returnPosInCodeLine] == 1)
+                return results[activeLine];
 
             countOfRunLine = countOfRunLine.add(BigInteger.ONE);
 
             int jumpIndex = code[activeLine][jumpPosInCodeLine];
             if (jumpIndex != 0 && results[activeLine] == 1) {
-                activeLine = jumpIndex - 1 >= activeLine ? jumpIndex : jumpIndex - 1;
+                activeLine = jumpIndex >= activeLine ? jumpIndex : jumpIndex - 1;
                 continue;
             }
 
             activeLine++;
         }
-
-        int returnInPos = -1;
-        for (int i = 0; i < code[0].length; i++)
-            if (code[i][returnPosInCodeLine] == 1)
-                returnInPos = i;
-
-        double roundResult = Math.round(results[returnInPos] * 100.0) / 100.0;
-        if (roundResult == 3.14)
-            return countOfRunLine;
-
-        return BigInteger.ZERO;
+        return null;
     }
 
-    public List<BigInteger> generatePI(int lineCount, BigInteger startIndex, BigInteger blockSize) {
-        setGlobalVariables(lineCount);
+    boolean testPiValue(Double piValue) {
+        return piValue != null && Math.round(piValue * 100.0) / 100.0 == 3.14;
+    }
+
+    public List<BigInteger> generatePI(BigInteger startIndex, BigInteger blockSize) {
         List<BigInteger> goodFunctionIndexes = new ArrayList<BigInteger>();
 
         BigInteger maxIndexInBlock = startIndex.add(blockSize);
@@ -147,44 +150,44 @@ public class CodeGenerator2 {
              index.compareTo(maxIndexInFunction) <= 0 &&
                      index.compareTo(maxIndexInBlock) < 0;
              index = index.add(BigInteger.ONE)) {
-            int[][] code = getCode(lineCount, index);
-            BigInteger countOfRunLine = runCode(code, BigInteger.valueOf(10000));
-            if (countOfRunLine.compareTo(BigInteger.ZERO) > 0)
+            int[][] code = getCode(index);
+            Double functionResult = runCode(code, BigInteger.valueOf(10000));
+            if(functionResult != null && testPiValue(functionResult))
                 goodFunctionIndexes.add(index);
         }
         return goodFunctionIndexes;
     }
 
 
-    BigInteger getIndexByCode(int[][] code) {
-        BigInteger index = BigInteger.ONE;
+    BigInteger getIndex(int[][] code) {
+        BigInteger index = BigInteger.ZERO;
         BigInteger mulFactor = BigInteger.ONE;
         for (int i = 0; i < code.length; i++) {
             for (int j = 0; j < 6; j++) {
-                switch (j){
+                switch (j) {
                     case returnPosInCodeLine:
-                        mulFactor = mulFactor.multiply(returnFlagCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(returnFlagCount);
                         break;
                     case valuePosInCodeLine:
-                        mulFactor = mulFactor.multiply(valuePlaceCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(valuePlaceCount);
                         break;
                     case funcPosInCodeLine:
-                        mulFactor = mulFactor.multiply(functionCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(functionCount);
                         break;
                     case param1PosInCodeLine:
-                        mulFactor = mulFactor.multiply(paramValuesCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(paramValuesCount);
                         break;
                     case param2PosInCodeLine:
-                        mulFactor = mulFactor.multiply(paramValuesCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(paramValuesCount);
                         break;
                     case jumpPosInCodeLine:
-                        mulFactor = mulFactor.multiply(jumpPlaceCount);
                         index = index.add(mulFactor.multiply(BigInteger.valueOf(code[i][j])));
+                        mulFactor = mulFactor.multiply(jumpPlaceCount);
                         break;
                 }
             }
@@ -204,43 +207,7 @@ public class CodeGenerator2 {
         return Math.sqrt(result * 6.0);
     }
 
-    //        static final double[] inputs = {0.0, 1.0, 6.0, 0.5};
-    public static void calculatePiInTableView() {
-        double res = 0.0 + 0.0;
-        double i = 1.0 + 0.0;
-        double dx = 1.0 + 0.0;
-        do {
-            i = i + 1.0;
-            res = res + dx;
-            double sqrI = i * i;
-            dx = 1.0 / sqrI;
-            double resMul6 = res * 6.0;
-            double piResult = Math.pow(resMul6, 0.5);
-        } while (i < 1000000.0 / 6.0); // while (0.0 == 0.0)
-    }
-
     public static void main(String[] args) {
-        CodeGenerator2 generator = new CodeGenerator2();
-        int[][] calculatePIInTableView = {
-                {0, 0, 0, 0, 0, 0},
-                {0, 0, 0, 1, 0, 0},
-                {0, 0, 0, 1, 0, 0},
-                {0, 2, 0, 5, 1, 0},
-                {0, 1, 0, 4, 6, 0},
-                {0, 0, 2, 5, 5, 0},
-                {0, 3, 3, 1, 9, 0},
-                {0, 0, 2, 4, 2, 0},
-                {1, 0, 4, 11, 3, 0},
-                {0, 0, 5, 0, 0, 7}
-        };
-        generator.setGlobalVariables(calculatePIInTableView[0].length);
-        BigInteger indexOfPiAlgorithm = generator.getIndexByCode(calculatePIInTableView);
-
-        List<BigInteger> goodFunctionIndexes = generator.generatePI(
-                calculatePIInTableView[0].length, indexOfPiAlgorithm, BigInteger.ONE);
-        for (int i = 0; i < goodFunctionIndexes.size(); i++)
-            if (goodFunctionIndexes.get(i).compareTo(indexOfPiAlgorithm) == 0)
-                System.out.println("Wow");
     }
 
 }
